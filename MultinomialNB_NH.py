@@ -1,5 +1,5 @@
-
 """
+
 Multinomial Naive Bayes
 
 """
@@ -15,10 +15,53 @@ from sklearn.metrics import accuracy_score
 #%% Importing and Defining Train/Test Sets
 
 df = pd.read_csv("newData.csv")
-#df.head(5)
 
+# Remove null values in target
+df = df[np.logical_not(df.RecruiterRelationship.isna())]
+
+#df.head(5)
+df.columns
 y = df['RecruiterRelationship']
-X = df[['CountryOfExploitation','gender','typeOfExploitConcatenated']]
+X = df[['majorityStatusAtExploit','CountryOfExploitation','typeOfExploitConcatenated']]
+
+#%% Data Quality
+
+def Qual_Stats(df):
+    columns = df.columns   
+    report = []
+    
+    for column in columns:     
+        name = column
+        count = df.shape[0]
+        missing_percent = (df[column].isnull().values.sum())/count
+        cardinality = df[column].nunique()
+        mode = df[column].value_counts().index[0]
+        mode_freq = df[column].value_counts().values[0]
+        mode_percent = mode_freq/count
+        mode_2 = df[column].value_counts().index[1]
+        mode_2_freq = df[column].value_counts().values[1]
+        mode_2_percent = mode_2_freq/count
+        
+        
+        row = {
+                'Feature': name,
+                'Count': count,
+                'Missing %': missing_percent, 
+                'Card.': cardinality, 
+                'Mode': mode,
+                'Mode Freq.': mode_freq,
+                'Mode %': mode_percent,
+                '2nd Mode': mode_2,
+                '2nd Mode Freq.': mode_2_freq,
+                '2nd Mode %': mode_2_percent
+                }
+        
+        report.append(row)
+    
+    return pd.DataFrame(report, columns = row.keys()).sort_values(by=['Missing %'], axis=0, ascending=False).reset_index(drop = True)
+
+report = Qual_Stats(df)
+report[['Feature','Missing %']]
 
 #%% Encode Variables
 
@@ -36,7 +79,7 @@ clf = MNB()
 
 #%% Cross Validation using Stratisfied 10-Fold
 
-kf = RepeatedKFold(n_splits=10, n_repeats=10, random_state=None)
+kf = RepeatedKFold(n_splits=10, n_repeats=10, random_state=0)
 
 scores = []
 for train_idx, test_idx in kf.split(X,y):
@@ -48,6 +91,6 @@ for train_idx, test_idx in kf.split(X,y):
     predictions = model.predict(X_test)
     scores.append(accuracy_score(y_test, predictions))
     
-print('Scores from each iteration: {}'.format(scores))
+#print('Scores from each iteration: {}'.format(scores))
 print('Average 10-Fold Accuracy: {}'.format(np.mean(scores)))
     
