@@ -1,3 +1,4 @@
+
 """
 
 Multinomial Naive Bayes
@@ -11,6 +12,8 @@ from sklearn import preprocessing
 from sklearn.naive_bayes import MultinomialNB as MNB
 from sklearn.model_selection import RepeatedKFold
 from sklearn.metrics import accuracy_score
+from operator import add
+import functools as fun
 
 #%% Importing and Defining Train/Test Sets
 
@@ -20,9 +23,11 @@ df = pd.read_csv("newData.csv")
 df = df[np.logical_not(df.RecruiterRelationship.isna())]
 
 #df.head(5)
-df.columns
+#df.columns
+
 y = df['RecruiterRelationship']
-X = df[['majorityStatusAtExploit','CountryOfExploitation','typeOfExploitConcatenated']]
+X = df[['majorityStatus','CountryOfExploitation','typeOfExploitConcatenated']]
+
 
 #%% Data Quality
 
@@ -65,11 +70,18 @@ report[['Feature','Missing %']]
 
 #%% Encode Variables
 
-#- Predictors
-X = pd.get_dummies(X, dummy_na = True)
-
 #- Target (we can use le_y() to decode outputs after prediction)
 y = y.replace(np.NaN, "-99").astype('category')
+
+filt = np.logical_not(y == '-99')
+#filt = np.logical_not(np.logical_or(y == 'Unknown', y == '-99'))
+#filt = np.logical_not(np.logical_or(np.logical_or(y == 'Unknown', y == '-99'), y == 'Various'))
+
+y = y[filt]
+
+#- Predictors
+X = pd.get_dummies(X, dummy_na = True)
+X = X[filt]
 
 le_y = preprocessing.LabelEncoder()
 y = le_y.fit_transform(y)
@@ -90,7 +102,24 @@ for train_idx, test_idx in kf.split(X,y):
     model = clf.fit(X_train, y_train)
     predictions = model.predict(X_test)
     scores.append(accuracy_score(y_test, predictions))
-    
-#print('Scores from each iteration: {}'.format(scores))
+print("Model training complete!")
 print('Average 10-Fold Accuracy: {}'.format(np.mean(scores)))
-    
+
+#%%    
+class_probs = []
+for i in range(0,len(clf.predict_proba(X_test))):
+    class_probs.append(list(clf.predict_proba(X_test)[i]))
+print("Concatenation Complete!")
+
+#%%
+final_probs = fun.reduce(lambda x,y: list(map(add,x,y)), class_probs)   
+print("Addition complete!")
+
+#%%
+avg_class_probs = list(map(lambda x: (x/len(clf.predict_proba(X_test)))*100, final_probs))
+print(avg_class_probs)
+
+target_cat = le_y.inverse_transform(range(0,17))
+
+kfold_predictions = pd.DataFrame(list(map(lambda x,y: (x,y), target_cat, avg_class_probs)))
+kfold_predictions.to_csv("Predicted_Classes.csv", index = False)
